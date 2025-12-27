@@ -20,7 +20,7 @@ import bcrypt
 # Load environment variables
 load_dotenv()
 
-app = FastAPI(title="Brownie Shop API")
+app = FastAPI(title="AniAthu's brownies API")
 
 # CORS middleware
 app.add_middleware(
@@ -35,9 +35,64 @@ app.add_middleware(
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="frontend"), name="static")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Static file serving for Vercel
+@app.get("/static/{file_path:path}")
+async def serve_static(file_path: str):
+    """Serve static files from frontend directory"""
+    static_file_path = Path("frontend") / file_path
+    
+    if not static_file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Determine content type
+    content_type = "text/plain"
+    if file_path.endswith('.css'):
+        content_type = "text/css"
+    elif file_path.endswith('.js'):
+        content_type = "application/javascript"
+    elif file_path.endswith('.html'):
+        content_type = "text/html"
+    elif file_path.endswith('.png'):
+        content_type = "image/png"
+    elif file_path.endswith('.jpg') or file_path.endswith('.jpeg'):
+        content_type = "image/jpeg"
+    elif file_path.endswith('.gif'):
+        content_type = "image/gif"
+    elif file_path.endswith('.svg'):
+        content_type = "image/svg+xml"
+    
+    return FileResponse(
+        static_file_path,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=3600"}
+    )
+
+# Upload file serving for Vercel
+@app.get("/uploads/{file_path:path}")
+async def serve_uploads(file_path: str):
+    """Serve uploaded files"""
+    upload_file_path = Path("uploads") / file_path
+    
+    if not upload_file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Determine content type for images
+    content_type = "application/octet-stream"
+    if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+        if file_path.lower().endswith('.png'):
+            content_type = "image/png"
+        elif file_path.lower().endswith(('.jpg', '.jpeg')):
+            content_type = "image/jpeg"
+        elif file_path.lower().endswith('.gif'):
+            content_type = "image/gif"
+        elif file_path.lower().endswith('.webp'):
+            content_type = "image/webp"
+    
+    return FileResponse(
+        upload_file_path,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"}
+    )
 
 # Initialize Supabase client
 supabase: Client = create_client(

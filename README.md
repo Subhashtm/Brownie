@@ -1,4 +1,4 @@
-# Sweet Brownies - Professional Brownie Shop Web App
+# AniAthu's brownies - Professional Brownie Shop Web App
 
 A modern, responsive web application for a brownie shop built with FastAPI, Supabase, and Dropbox integration.
 
