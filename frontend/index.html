@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sweet Brownies - Premium Brownie Shop</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <i class="fas fa-cookie-bite"></i>
+                <span>Sweet Brownies</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#home" class="nav-link">Home</a></li>
+                <li><a href="#products" class="nav-link">Products</a></li>
+                <li><a href="#about" class="nav-link">About</a></li>
+                <li><a href="#contact" class="nav-link">Contact</a></li>
+                <li><a href="#" class="nav-link" id="cart-btn"><i class="fas fa-shopping-cart"></i> Cart (<span id="cart-count">0</span>)</a></li>
+                <li><a href="#" class="nav-link" id="login-btn">Login</a></li>
+                <li><a href="#" class="nav-link hidden" id="logout-btn">Logout</a></li>
+                <li><a href="#" class="nav-link hidden" id="admin-btn">Admin Panel</a></li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-content">
+            <h1>Premium Handcrafted Brownies</h1>
+            <p>Indulge in our rich, fudgy brownies made with the finest ingredients</p>
+            <button class="cta-btn" onclick="scrollToProducts()">Shop Now</button>
+        </div>
+        <div class="hero-image">
+            <img src="https://images.unsplash.com/photo-1606313564200-e75d5e30476c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Delicious Brownies">
+        </div>
+    </section>
+
+    <!-- Products Section -->
+    <section id="products" class="products-section">
+        <div class="container">
+            <h2>Our Delicious Brownies</h2>
+            <div class="products-grid" id="products-grid">
+                <!-- Products will be loaded here -->
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about-section">
+        <div class="container">
+            <div class="about-content">
+                <div class="about-text">
+                    <h2>About Sweet Brownies</h2>
+                    <p>We are passionate bakers dedicated to creating the most delicious, fudgy brownies you've ever tasted. Using only premium ingredients and traditional baking methods, each brownie is crafted with love and attention to detail.</p>
+                    <p>From classic chocolate to innovative flavors, our brownies are perfect for any occasion - whether you're treating yourself or sharing with loved ones.</p>
+                </div>
+                <div class="about-image">
+                    <img src="https://images.unsplash.com/photo-1578985545062-69928b1d9587?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" alt="Baking Process">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact-section">
+        <div class="container">
+            <h2>Contact Us</h2>
+            <div class="contact-content">
+                <div class="contact-info" id="contact-info">
+                    <!-- Contact info will be loaded here -->
+                </div>
+                <div class="contact-form">
+                    <form id="contact-form">
+                        <input type="text" placeholder="Your Name" required>
+                        <input type="email" placeholder="Your Email" required>
+                        <textarea placeholder="Your Message" rows="5" required></textarea>
+                        <button type="submit">Send Message</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3><i class="fas fa-cookie-bite"></i> Sweet Brownies</h3>
+                    <p>Premium handcrafted brownies made with love</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="#home">Home</a></li>
+                        <li><a href="#products">Products</a></li>
+                        <li><a href="#about">About</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Follow Us</h4>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Sweet Brownies. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modals -->
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Login</h2>
+            <form id="login-form">
+                <input type="email" id="login-email" placeholder="Email" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button type="submit">Login</button>
+            </form>
+            <p>Don't have an account? <a href="#" id="show-register">Register here</a></p>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div id="register-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Register</h2>
+            <form id="register-form">
+                <input type="text" id="register-name" placeholder="Full Name" required>
+                <input type="email" id="register-email" placeholder="Email" required>
+                <input type="password" id="register-password" placeholder="Password" required>
+                <button type="submit">Register</button>
+            </form>
+            <p>Already have an account? <a href="#" id="show-login">Login here</a></p>
+        </div>
+    </div>
+
+    <!-- Cart Modal -->
+    <div id="cart-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Shopping Cart</h2>
+            <div id="cart-items">
+                <!-- Cart items will be loaded here -->
+            </div>
+            <div class="cart-total">
+                <h3>Total: ₹<span id="cart-total">0.00</span></h3>
+                <button id="checkout-btn" class="cta-btn">Proceed to Checkout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div id="checkout-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Checkout</h2>
+            <div class="checkout-content">
+                <div class="payment-qr">
+                    <h3>Payment QR Code</h3>
+                    <img id="payment-qr-img" src="" alt="Payment QR Code">
+                    <p>Scan the QR code to make payment</p>
+                </div>
+                <div class="payment-instructions">
+                    <h3>Payment Instructions</h3>
+                    <p>1. Scan the QR code above to make payment</p>
+                    <p>2. After payment, share the receipt to: <strong id="payment-email"></strong></p>
+                    <p>3. Your order will be confirmed once payment is verified</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Panel Modal -->
+    <div id="admin-modal" class="modal">
+        <div class="modal-content admin-content">
+            <span class="close">&times;</span>
+            <h2>Admin Panel</h2>
+            <div class="admin-tabs">
+                <button class="tab-btn active" data-tab="products">Products</button>
+                <button class="tab-btn" data-tab="settings">Settings</button>
+            </div>
+            
+            <div id="products-tab" class="tab-content active">
+                <h3>Manage Products</h3>
+                <button id="add-product-btn" class="cta-btn">Add New Product</button>
+                <div id="admin-products-list">
+                    <!-- Admin products will be loaded here -->
+                </div>
+            </div>
+            
+            <div id="settings-tab" class="tab-content">
+                <h3>Settings</h3>
+                <div class="settings-section">
+                    <h4>Contact Information</h4>
+                    <form id="contact-settings-form">
+                        <input type="email" id="contact-email" placeholder="Contact Email">
+                        <input type="tel" id="contact-phone" placeholder="Phone Number">
+                        <textarea id="contact-address" placeholder="Address"></textarea>
+                        <button type="submit">Update Contact Info</button>
+                    </form>
+                </div>
+                <div class="settings-section">
+                    <h4>Payment Information</h4>
+                    <form id="payment-settings-form">
+                        <input type="url" id="payment-qr-url" placeholder="Payment QR Code URL">
+                        <input type="email" id="payment-email-setting" placeholder="Payment Receipt Email">
+                        <button type="submit">Update Payment Info</button>
+                    </form>
+                </div>
+                <div class="settings-section">
+                    <h4>Image Upload</h4>
+                    <p>Images are stored locally on the server. Supported formats: JPG, PNG, GIF, WebP</p>
+                    <p>Images will be automatically optimized and resized for web display.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Form Modal -->
+    <div id="product-form-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="product-form-title">Add Product</h2>
+            <form id="product-form">
+                <input type="hidden" id="product-id">
+                <input type="text" id="product-name" placeholder="Product Name" required>
+                <textarea id="product-description" placeholder="Product Description" required></textarea>
+                <input type="number" id="product-price" placeholder="Price" step="0.01" required>
+                <select id="product-category">
+                    <option value="brownie">Brownie</option>
+                    <option value="special">Special</option>
+                </select>
+                <input type="file" id="product-image" accept="image/*">
+                <label>
+                    <input type="checkbox" id="product-available" checked> Available
+                </label>
+                <button type="submit">Save Product</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
