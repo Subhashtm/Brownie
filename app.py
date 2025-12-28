@@ -13,9 +13,9 @@ from pydantic import BaseModel
 from typing import Optional, List
 import json
 import smtplib
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
-from email.mime.base import MimeBase
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
 from email import encoders
 
 # Try to import optional dependencies
@@ -254,18 +254,18 @@ def send_email(to_email: str, subject: str, body: str, attachment_path: Optional
             print("Email credentials not configured - skipping email notification")
             return False
         
-        msg = MimeMultipart()
+        msg = MIMEMultipart()
         msg['From'] = smtp_username
         msg['To'] = to_email
         msg['Subject'] = subject
         
-        msg.attach(MimeText(body, 'plain'))
+        msg.attach(MIMEText(body, 'plain'))
         
         # Add attachment if provided
         if attachment_path and os.path.exists(attachment_path):
             try:
                 with open(attachment_path, "rb") as attachment:
-                    part = MimeBase('application', 'octet-stream')
+                    part = MIMEBase('application', 'octet-stream')
                     part.set_payload(attachment.read())
                     encoders.encode_base64(part)
                     part.add_header(
