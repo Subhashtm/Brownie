@@ -182,8 +182,17 @@
                 <div class="payment-instructions">
                     <h3>Payment Instructions</h3>
                     <p>1. Scan the QR code above to make payment</p>
-                    <p>2. After payment, share the receipt to: <strong id="payment-email"></strong></p>
+                    <p>2. After payment, upload your receipt below OR email it to: <strong id="payment-email"></strong></p>
                     <p>3. Your order will be confirmed once payment is verified</p>
+                    
+                    <div class="payment-upload-section">
+                        <h4>Upload Payment Receipt</h4>
+                        <form id="payment-upload-form">
+                            <input type="file" id="payment-receipt" accept="image/*" required>
+                            <textarea id="payment-notes" placeholder="Additional notes (optional)" rows="3"></textarea>
+                            <button type="submit" class="cta-btn">Upload Receipt</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -196,6 +205,7 @@
             <h2>Admin Panel</h2>
             <div class="admin-tabs">
                 <button class="tab-btn active" data-tab="products">Products</button>
+                <button class="tab-btn" data-tab="payments">Payment Uploads</button>
                 <button class="tab-btn" data-tab="settings">Settings</button>
             </div>
             
@@ -207,8 +217,23 @@
                 </div>
             </div>
             
+            <div id="payments-tab" class="tab-content">
+                <h3>Payment Uploads</h3>
+                <div id="payment-uploads-list">
+                    <!-- Payment uploads will be loaded here -->
+                </div>
+            </div>
+            
             <div id="settings-tab" class="tab-content">
                 <h3>Settings</h3>
+                <div class="settings-section">
+                    <h4>Company Information</h4>
+                    <form id="company-settings-form">
+                        <input type="text" id="company-name" placeholder="Company Name">
+                        <input type="text" id="company-tagline" placeholder="Company Tagline">
+                        <button type="submit">Update Company Info</button>
+                    </form>
+                </div>
                 <div class="settings-section">
                     <h4>Contact Information</h4>
                     <form id="contact-settings-form">

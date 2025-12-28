@@ -3,6 +3,7 @@ let currentUser = null;
 let cart = [];
 let products = [];
 let isAdmin = false;
+let currentOrderId = null;
 
 // API base URL
 const API_BASE = '';
@@ -13,6 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEventListeners();
     loadProducts();
     loadContactInfo();
+    loadCompanyInfo();
     checkAuthStatus();
 });
 
@@ -62,8 +64,12 @@ function setupEventListeners() {
     // Admin forms
     document.getElementById('add-product-btn').addEventListener('click', showAddProductForm);
     document.getElementById('product-form').addEventListener('submit', handleProductSubmit);
+    document.getElementById('company-settings-form').addEventListener('submit', handleCompanyUpdate);
     document.getElementById('contact-settings-form').addEventListener('submit', handleContactUpdate);
     document.getElementById('payment-settings-form').addEventListener('submit', handlePaymentUpdate);
+    
+    // Payment upload
+    document.getElementById('payment-upload-form').addEventListener('submit', handlePaymentUpload);
     
     // Contact form
     document.getElementById('contact-form').addEventListener('submit', handleContactForm);
@@ -392,6 +398,26 @@ async function showCheckout() {
     }
     
     try {
+        // Create order first
+        const orderItems = cart.map(item => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            price: item.products.price
+        }));
+        
+        const totalAmount = cart.reduce((total, item) => total + (item.products.price * item.quantity), 0);
+        
+        const orderResponse = await apiCall('/create-order', {
+            method: 'POST',
+            body: JSON.stringify({
+                items: orderItems,
+                total_amount: totalAmount
+            })
+        });
+        
+        currentOrderId = orderResponse.order_id;
+        
+        // Load payment info
         const paymentInfo = await apiCall('/payment-info');
         
         document.getElementById('payment-qr-img').src = paymentInfo.qr_code_url || 'https://via.placeholder.com/200x200?text=QR+Code';
@@ -400,7 +426,51 @@ async function showCheckout() {
         document.getElementById('cart-modal').style.display = 'none';
         document.getElementById('checkout-modal').style.display = 'block';
     } catch (error) {
-        showNotification('Failed to load payment information', 'error');
+        showNotification('Failed to create order', 'error');
+    }
+}
+
+async function handlePaymentUpload(e) {
+    e.preventDefault();
+    
+    if (!currentOrderId) {
+        showNotification('No active order found', 'error');
+        return;
+    }
+    
+    const fileInput = document.getElementById('payment-receipt');
+    const notesInput = document.getElementById('payment-notes');
+    
+    if (!fileInput.files[0]) {
+        showNotification('Please select a receipt image', 'error');
+        return;
+    }
+    
+    try {
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('notes', notesInput.value);
+        
+        const response = await fetch(`/api/upload-payment-receipt/${currentOrderId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${currentUser.token}`
+            },
+            body: formData
+        });
+        
+        if (response.ok) {
+            showNotification('Payment receipt uploaded successfully! We will verify and confirm your order soon.', 'success');
+            document.getElementById('checkout-modal').style.display = 'none';
+            currentOrderId = null;
+            // Reset form
+            document.getElementById('payment-upload-form').reset();
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Upload failed');
+        }
+    } catch (error) {
+        showNotification(`Failed to upload receipt: ${error.message}`, 'error');
     }
 }
 
@@ -411,6 +481,34 @@ async function loadContactInfo() {
         displayContactInfo(contactInfo);
     } catch (error) {
         console.error('Failed to load contact info:', error);
+    }
+}
+
+async function loadCompanyInfo() {
+    try {
+        const companyInfo = await apiCall('/company-info');
+        // Update page title and branding
+        document.title = `${companyInfo.name} - ${companyInfo.tagline}`;
+        
+        // Update navigation logo
+        const navLogo = document.querySelector('.nav-logo span');
+        if (navLogo) {
+            navLogo.textContent = companyInfo.name;
+        }
+        
+        // Update hero section
+        const heroTitle = document.querySelector('.hero-content h1');
+        if (heroTitle) {
+            heroTitle.textContent = companyInfo.tagline;
+        }
+        
+        // Update footer
+        const footerLogo = document.querySelector('.footer-section h3');
+        if (footerLogo) {
+            footerLogo.innerHTML = `<i class="fas fa-cookie-bite"></i> ${companyInfo.name}`;
+        }
+    } catch (error) {
+        console.error('Failed to load company info:', error);
     }
 }
 
@@ -438,6 +536,7 @@ function showAdminPanel() {
     }
     
     loadAdminProducts();
+    loadPaymentUploads();
     loadAdminSettings();
     document.getElementById('admin-modal').style.display = 'block';
 }
@@ -592,10 +691,15 @@ async function deleteProduct(productId) {
 
 async function loadAdminSettings() {
     try {
-        const [contactInfo, paymentInfo] = await Promise.all([
+        const [contactInfo, paymentInfo, companyInfo] = await Promise.all([
             apiCall('/contact'),
-            apiCall('/payment-info')
+            apiCall('/payment-info'),
+            apiCall('/company-info')
         ]);
+        
+        // Populate company form
+        document.getElementById('company-name').value = companyInfo.name;
+        document.getElementById('company-tagline').value = companyInfo.tagline;
         
         // Populate contact form
         document.getElementById('contact-email').value = contactInfo.email;
@@ -607,6 +711,105 @@ async function loadAdminSettings() {
         document.getElementById('payment-email-setting').value = paymentInfo.payment_email;
     } catch (error) {
         console.error('Failed to load admin settings:', error);
+    }
+}
+
+async function handleCompanyUpdate(e) {
+    e.preventDefault();
+    
+    const companyData = {
+        name: document.getElementById('company-name').value,
+        tagline: document.getElementById('company-tagline').value
+    };
+    
+    try {
+        await apiCall('/admin/company-info', {
+            method: 'PUT',
+            body: JSON.stringify(companyData)
+        });
+        
+        loadCompanyInfo(); // Refresh company display
+        showNotification('Company information updated!', 'success');
+    } catch (error) {
+        showNotification('Failed to update company information', 'error');
+    }
+}
+
+async function loadPaymentUploads() {
+    try {
+        const uploads = await apiCall('/admin/payment-uploads');
+        displayPaymentUploads(uploads);
+    } catch (error) {
+        console.error('Failed to load payment uploads:', error);
+    }
+}
+
+function displayPaymentUploads(uploads) {
+    const container = document.getElementById('payment-uploads-list');
+    container.innerHTML = '';
+    
+    if (uploads.length === 0) {
+        container.innerHTML = '<p>No payment uploads found</p>';
+        return;
+    }
+    
+    uploads.forEach(upload => {
+        const uploadItem = document.createElement('div');
+        uploadItem.className = 'payment-upload-item';
+        
+        const statusClass = upload.status === 'approved' ? 'status-approved' : 
+                           upload.status === 'rejected' ? 'status-rejected' : 'status-pending';
+        
+        uploadItem.innerHTML = `
+            <div class="upload-info">
+                <h4>Order #${upload.order_id}</h4>
+                <p>Customer: ${upload.user_email}</p>
+                <p>Amount: ₹${upload.orders.total_amount}</p>
+                <p>Upload Time: ${new Date(upload.upload_time).toLocaleString()}</p>
+                <p class="status ${statusClass}">Status: ${upload.status}</p>
+                <a href="${upload.file_path}" target="_blank" class="view-receipt-btn">View Receipt</a>
+            </div>
+            <div class="upload-actions">
+                <select id="status-${upload.id}" ${upload.status !== 'pending' ? 'disabled' : ''}>
+                    <option value="pending" ${upload.status === 'pending' ? 'selected' : ''}>Pending</option>
+                    <option value="approved" ${upload.status === 'approved' ? 'selected' : ''}>Approved</option>
+                    <option value="rejected" ${upload.status === 'rejected' ? 'selected' : ''}>Rejected</option>
+                </select>
+                <textarea id="notes-${upload.id}" placeholder="Admin notes" ${upload.status !== 'pending' ? 'disabled' : ''}>${upload.admin_notes || ''}</textarea>
+                <button onclick="updatePaymentStatus(${upload.id})" ${upload.status !== 'pending' ? 'disabled' : ''}>Update</button>
+            </div>
+        `;
+        
+        container.appendChild(uploadItem);
+    });
+}
+
+async function updatePaymentStatus(uploadId) {
+    const status = document.getElementById(`status-${uploadId}`).value;
+    const notes = document.getElementById(`notes-${uploadId}`).value;
+    
+    try {
+        const formData = new FormData();
+        formData.append('status', status);
+        formData.append('admin_notes', notes);
+        
+        const response = await fetch(`/api/admin/payment-uploads/${uploadId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${currentUser.token}`
+            },
+            body: formData
+        });
+        
+        if (response.ok) {
+            showNotification('Payment status updated!', 'success');
+            loadPaymentUploads(); // Refresh the list
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Update failed');
+        }
+    } catch (error) {
+        showNotification(`Failed to update status: ${error.message}`, 'error');
     }
 }
 

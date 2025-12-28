@@ -16,6 +16,11 @@ from typing import Optional, List
 import json
 from PIL import Image
 import bcrypt
+import smtplib
+from email.mime.text import MimeText
+from email.mime.multipart import MimeMultipart
+from email.mime.base import MimeBase
+from email import encoders
 
 # Load environment variables
 load_dotenv()
@@ -145,6 +150,18 @@ class PaymentInfo(BaseModel):
     qr_code_url: str
     payment_email: str
 
+class CompanyInfo(BaseModel):
+    name: str
+    tagline: str
+
+class OrderCreate(BaseModel):
+    items: List[dict]
+    total_amount: float
+
+class PaymentUpload(BaseModel):
+    order_id: int
+    notes: Optional[str] = None
+
 # Helper functions
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -181,6 +198,49 @@ def verify_password(plain_password: str, hashed_password: str):
     password_bytes = plain_password.encode('utf-8')[:72]
     hashed_bytes = hashed_password.encode('utf-8')
     return bcrypt.checkpw(password_bytes, hashed_bytes)
+
+def send_email(to_email: str, subject: str, body: str, attachment_path: Optional[str] = None):
+    """Send email notification"""
+    try:
+        smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_username = os.getenv("SMTP_USERNAME")
+        smtp_password = os.getenv("SMTP_PASSWORD")
+        
+        if not all([smtp_username, smtp_password]):
+            print("Email credentials not configured")
+            return False
+        
+        msg = MimeMultipart()
+        msg['From'] = smtp_username
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        
+        msg.attach(MimeText(body, 'plain'))
+        
+        # Add attachment if provided
+        if attachment_path and os.path.exists(attachment_path):
+            with open(attachment_path, "rb") as attachment:
+                part = MimeBase('application', 'octet-stream')
+                part.set_payload(attachment.read())
+                encoders.encode_base64(part)
+                part.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename= {os.path.basename(attachment_path)}'
+                )
+                msg.attach(part)
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        text = msg.as_string()
+        server.sendmail(smtp_username, to_email, text)
+        server.quit()
+        
+        return True
+    except Exception as e:
+        print(f"Email sending failed: {e}")
+        return False
 
 # Routes
 @app.get("/", response_class=HTMLResponse)
@@ -364,11 +424,12 @@ async def get_contact_info():
 @app.put("/api/admin/contact")
 async def update_contact_info(contact: ContactInfo, admin_email: str = Depends(verify_admin)):
     try:
-        # Upsert contact info
+        # Use upsert with match to handle the unique constraint properly
         result = supabase.table("settings").upsert({
             "key": "contact_info",
-            "value": json.dumps(contact.dict())
-        }).execute()
+            "value": json.dumps(contact.dict()),
+            "updated_at": datetime.utcnow().isoformat()
+        }, on_conflict="key").execute()
         return {"message": "Contact info updated"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -388,9 +449,165 @@ async def update_payment_info(payment: PaymentInfo, admin_email: str = Depends(v
     try:
         result = supabase.table("settings").upsert({
             "key": "payment_info",
-            "value": json.dumps(payment.dict())
-        }).execute()
+            "value": json.dumps(payment.dict()),
+            "updated_at": datetime.utcnow().isoformat()
+        }, on_conflict="key").execute()
         return {"message": "Payment info updated"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/company-info")
+async def get_company_info():
+    try:
+        result = supabase.table("settings").select("*").eq("key", "company_info").execute()
+        if result.data:
+            return json.loads(result.data[0]["value"])
+        return {"name": "AniAthu's brownies", "tagline": "Premium Handcrafted Brownies"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/api/admin/company-info")
+async def update_company_info(company: CompanyInfo, admin_email: str = Depends(verify_admin)):
+    try:
+        result = supabase.table("settings").upsert({
+            "key": "company_info",
+            "value": json.dumps(company.dict()),
+            "updated_at": datetime.utcnow().isoformat()
+        }, on_conflict="key").execute()
+        return {"message": "Company info updated"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/create-order")
+async def create_order(order: OrderCreate, email: str = Depends(verify_token)):
+    try:
+        # Create order
+        order_result = supabase.table("orders").insert({
+            "user_email": email,
+            "total_amount": order.total_amount,
+            "status": "pending",
+            "created_at": datetime.utcnow().isoformat()
+        }).execute()
+        
+        order_id = order_result.data[0]["id"]
+        
+        # Create order items
+        for item in order.items:
+            supabase.table("order_items").insert({
+                "order_id": order_id,
+                "product_id": item["product_id"],
+                "quantity": item["quantity"],
+                "price": item["price"]
+            }).execute()
+        
+        # Clear cart
+        supabase.table("cart").delete().eq("user_email", email).execute()
+        
+        return {"order_id": order_id, "message": "Order created successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/upload-payment-receipt/{order_id}")
+async def upload_payment_receipt(
+    order_id: int,
+    file: UploadFile = File(...),
+    notes: str = Form(""),
+    email: str = Depends(verify_token)
+):
+    try:
+        # Validate file type
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Generate unique filename
+        file_extension = file.filename.split('.')[-1].lower()
+        if file_extension not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+            raise HTTPException(status_code=400, detail="Unsupported image format")
+        
+        unique_filename = f"payment_{order_id}_{uuid.uuid4()}.{file_extension}"
+        file_path = UPLOAD_DIR / unique_filename
+        
+        # Save uploaded file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Save to database
+        upload_result = supabase.table("payment_uploads").insert({
+            "order_id": order_id,
+            "user_email": email,
+            "file_path": f"/uploads/{unique_filename}",
+            "upload_time": datetime.utcnow().isoformat(),
+            "status": "pending"
+        }).execute()
+        
+        # Get order details for email
+        order_result = supabase.table("orders").select("*").eq("id", order_id).execute()
+        if not order_result.data:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        order = order_result.data[0]
+        
+        # Send email to admin
+        admin_email = os.getenv("ADMIN_EMAIL", "admin@shop.com")
+        subject = f"New Payment Receipt Uploaded - Order #{order_id}"
+        body = f"""
+        A new payment receipt has been uploaded for Order #{order_id}.
+        
+        Order Details:
+        - Order ID: {order_id}
+        - Customer Email: {email}
+        - Total Amount: ₹{order['total_amount']}
+        - Upload Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}
+        
+        Customer Notes: {notes if notes else 'None'}
+        
+        Please review the payment receipt and update the order status accordingly.
+        
+        Receipt file: {unique_filename}
+        """
+        
+        # Send email notification
+        send_email(admin_email, subject, body, str(file_path))
+        
+        return {"message": "Payment receipt uploaded successfully", "upload_id": upload_result.data[0]["id"]}
+        
+    except Exception as e:
+        # Clean up file if it was created
+        if 'file_path' in locals() and file_path.exists():
+            file_path.unlink()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/admin/payment-uploads")
+async def get_payment_uploads(admin_email: str = Depends(verify_admin)):
+    try:
+        result = supabase.table("payment_uploads").select("*, orders(*)").order("upload_time", desc=True).execute()
+        return result.data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/api/admin/payment-uploads/{upload_id}/status")
+async def update_payment_status(
+    upload_id: int,
+    status: str = Form(...),
+    admin_notes: str = Form(""),
+    admin_email: str = Depends(verify_admin)
+):
+    try:
+        # Update payment upload status
+        result = supabase.table("payment_uploads").update({
+            "status": status,
+            "admin_notes": admin_notes
+        }).eq("id", upload_id).execute()
+        
+        if status == "approved":
+            # Get upload details to update order
+            upload_result = supabase.table("payment_uploads").select("*, orders(*)").eq("id", upload_id).execute()
+            if upload_result.data:
+                order_id = upload_result.data[0]["order_id"]
+                # Update order status
+                supabase.table("orders").update({"status": "confirmed"}).eq("id", order_id).execute()
+        
+        return {"message": "Payment status updated"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

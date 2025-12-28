@@ -56,6 +56,17 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create payment_uploads table for payment receipt uploads
+CREATE TABLE IF NOT EXISTS payment_uploads (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+    user_email VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL,
+    upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(50) DEFAULT 'pending',
+    admin_notes TEXT
+);
+
 -- Insert sample products
 INSERT INTO products (name, description, price, category, image_url) VALUES
 ('Classic Chocolate Brownie', 'Rich and fudgy chocolate brownie made with premium cocoa', 199.99, 'brownie', ''),
@@ -68,7 +79,9 @@ INSERT INTO products (name, description, price, category, image_url) VALUES
 -- Insert default settings
 INSERT INTO settings (key, value) VALUES
 ('contact_info', '{"email": "contact@brownieshop.com", "phone": "+91-9876543210", "address": "123 Brownie Street, Sweet City, Mumbai, Maharashtra 400001"}'),
-('payment_info', '{"qr_code_url": "", "payment_email": "payments@brownieshop.com"}');
+('payment_info', '{"qr_code_url": "", "payment_email": "payments@brownieshop.com"}'),
+('company_info', '{"name": "AniAthu''s brownies", "tagline": "Premium Handcrafted Brownies"}')
+ON CONFLICT (key) DO NOTHING;
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);

@@ -685,3 +685,160 @@ body {
         font-size: 2rem;
     }
 }
+/* Payment Upload Styles */
+.payment-upload-section {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+}
+
+.payment-upload-section h4 {
+    color: #8B4513;
+    margin-bottom: 1rem;
+}
+
+.payment-upload-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    background: #f9f9f9;
+}
+
+.upload-info {
+    flex: 1;
+}
+
+.upload-info h4 {
+    color: #8B4513;
+    margin-bottom: 0.5rem;
+}
+
+.upload-info p {
+    margin-bottom: 0.3rem;
+    color: #666;
+}
+
+.status {
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-approved {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-rejected {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.view-receipt-btn {
+    display: inline-block;
+    background: #007bff;
+    color: white;
+    padding: 5px 10px;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.view-receipt-btn:hover {
+    background: #0056b3;
+}
+
+.upload-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 200px;
+}
+
+.upload-actions select,
+.upload-actions textarea,
+.upload-actions button {
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.upload-actions textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.upload-actions button {
+    background: #28a745;
+    color: white;
+    cursor: pointer;
+}
+
+.upload-actions button:hover {
+    background: #218838;
+}
+
+.upload-actions button:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+/* Notification Styles */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 5px;
+    color: white;
+    z-index: 3000;
+    font-size: 14px;
+    max-width: 300px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.notification.success {
+    background-color: #28a745;
+}
+
+.notification.error {
+    background-color: #dc3545;
+}
+
+.notification.info {
+    background-color: #17a2b8;
+}
+
+/* Mobile Responsive for Payment Uploads */
+@media (max-width: 768px) {
+    .payment-upload-item {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .upload-actions {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .checkout-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .payment-upload-section {
+        margin-top: 1rem;
+    }
+}
