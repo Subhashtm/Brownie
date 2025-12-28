@@ -8,19 +8,45 @@ import shutil
 import uuid
 from pathlib import Path
 from dotenv import load_dotenv
-from supabase import create_client, Client
 from datetime import datetime, timedelta
-from jose import JWTError, jwt
 from pydantic import BaseModel
 from typing import Optional, List
 import json
-from PIL import Image
-import bcrypt
 import smtplib
 from email.mime.text import MimeText
 from email.mime.multipart import MimeMultipart
 from email.mime.base import MimeBase
 from email import encoders
+
+# Try to import optional dependencies
+try:
+    from supabase import create_client, Client
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    print("Warning: Supabase not available")
+    SUPABASE_AVAILABLE = False
+    Client = None
+
+try:
+    from jose import JWTError, jwt
+    JWT_AVAILABLE = True
+except ImportError:
+    print("Warning: JWT not available")
+    JWT_AVAILABLE = False
+
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    print("Warning: PIL not available")
+    PIL_AVAILABLE = False
+
+try:
+    import bcrypt
+    BCRYPT_AVAILABLE = True
+except ImportError:
+    print("Warning: bcrypt not available")
+    BCRYPT_AVAILABLE = False
 
 # Load environment variables
 load_dotenv()
@@ -100,10 +126,19 @@ async def serve_uploads(file_path: str):
     )
 
 # Initialize Supabase client
-supabase: Client = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_KEY")
-)
+try:
+    if SUPABASE_AVAILABLE:
+        supabase: Client = create_client(
+            os.getenv("SUPABASE_URL"),
+            os.getenv("SUPABASE_KEY")
+        )
+        print("Supabase client initialized successfully")
+    else:
+        supabase = None
+        print("Supabase not available - running in limited mode")
+except Exception as e:
+    print(f"Failed to initialize Supabase client: {e}")
+    supabase = None
 
 # Security
 security = HTTPBearer()
@@ -164,6 +199,8 @@ class PaymentUpload(BaseModel):
 
 # Helper functions
 def create_access_token(data: dict):
+    if not JWT_AVAILABLE:
+        raise HTTPException(status_code=500, detail="JWT not available")
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
@@ -171,6 +208,8 @@ def create_access_token(data: dict):
     return encoded_jwt
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not JWT_AVAILABLE:
+        raise HTTPException(status_code=500, detail="JWT not available")
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
@@ -186,6 +225,8 @@ def verify_admin(email: str = Depends(verify_token)):
     return email
 
 def hash_password(password: str):
+    if not BCRYPT_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Password hashing not available")
     # Truncate password to 72 bytes for bcrypt compatibility
     password_bytes = password.encode('utf-8')[:72]
     # Generate salt and hash password
@@ -194,6 +235,8 @@ def hash_password(password: str):
     return hashed.decode('utf-8')
 
 def verify_password(plain_password: str, hashed_password: str):
+    if not BCRYPT_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Password verification not available")
     # Truncate password to 72 bytes for bcrypt compatibility
     password_bytes = plain_password.encode('utf-8')[:72]
     hashed_bytes = hashed_password.encode('utf-8')
@@ -208,7 +251,7 @@ def send_email(to_email: str, subject: str, body: str, attachment_path: Optional
         smtp_password = os.getenv("SMTP_PASSWORD")
         
         if not all([smtp_username, smtp_password]):
-            print("Email credentials not configured")
+            print("Email credentials not configured - skipping email notification")
             return False
         
         msg = MimeMultipart()
@@ -220,15 +263,18 @@ def send_email(to_email: str, subject: str, body: str, attachment_path: Optional
         
         # Add attachment if provided
         if attachment_path and os.path.exists(attachment_path):
-            with open(attachment_path, "rb") as attachment:
-                part = MimeBase('application', 'octet-stream')
-                part.set_payload(attachment.read())
-                encoders.encode_base64(part)
-                part.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename= {os.path.basename(attachment_path)}'
-                )
-                msg.attach(part)
+            try:
+                with open(attachment_path, "rb") as attachment:
+                    part = MimeBase('application', 'octet-stream')
+                    part.set_payload(attachment.read())
+                    encoders.encode_base64(part)
+                    part.add_header(
+                        'Content-Disposition',
+                        f'attachment; filename= {os.path.basename(attachment_path)}'
+                    )
+                    msg.attach(part)
+            except Exception as e:
+                print(f"Failed to attach file: {e}")
         
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
@@ -237,12 +283,32 @@ def send_email(to_email: str, subject: str, body: str, attachment_path: Optional
         server.sendmail(smtp_username, to_email, text)
         server.quit()
         
+        print(f"Email sent successfully to {to_email}")
         return True
     except Exception as e:
         print(f"Email sending failed: {e}")
         return False
 
 # Routes
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "supabase_connected": supabase is not None,
+        "dependencies": {
+            "supabase": SUPABASE_AVAILABLE,
+            "jwt": JWT_AVAILABLE,
+            "bcrypt": BCRYPT_AVAILABLE,
+            "pil": PIL_AVAILABLE
+        },
+        "environment_vars": {
+            "SUPABASE_URL": bool(os.getenv("SUPABASE_URL")),
+            "SUPABASE_KEY": bool(os.getenv("SUPABASE_KEY")),
+            "SECRET_KEY": bool(os.getenv("SECRET_KEY")),
+            "ADMIN_EMAIL": bool(os.getenv("ADMIN_EMAIL"))
+        }
+    }
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
     return FileResponse("frontend/index.html")
@@ -289,6 +355,8 @@ async def login(user: UserLogin):
 @app.get("/api/products")
 async def get_products():
     try:
+        if not supabase:
+            raise HTTPException(status_code=500, detail="Database not available")
         result = supabase.table("products").select("*").eq("available", True).execute()
         return result.data
     except Exception as e:
@@ -349,19 +417,26 @@ async def upload_image(file: UploadFile = File(...), admin_email: str = Depends(
             shutil.copyfileobj(file.file, buffer)
         
         # Optimize image (resize if too large)
-        try:
-            with Image.open(file_path) as img:
-                # Convert to RGB if necessary
-                if img.mode in ('RGBA', 'P'):
-                    img = convert('RGB')
-                
-                # Resize if image is too large
-                max_size = (800, 600)
-                if img.size[0] > max_size[0] or img.size[1] > max_size[1]:
-                    img.thumbnail(max_size, Image.Resampling.LANCZOS)
-                    img.save(file_path, optimize=True, quality=85)
-        except Exception as e:
-            print(f"Image optimization failed: {e}")
+        if PIL_AVAILABLE:
+            try:
+                with Image.open(file_path) as img:
+                    # Convert to RGB if necessary
+                    if img.mode in ('RGBA', 'P'):
+                        img = img.convert('RGB')
+                    
+                    # Resize if image is too large
+                    max_size = (800, 600)
+                    if img.size[0] > max_size[0] or img.size[1] > max_size[1]:
+                        # Use LANCZOS for older Pillow versions, LANCZOS for newer ones
+                        try:
+                            img.thumbnail(max_size, Image.Resampling.LANCZOS)
+                        except AttributeError:
+                            img.thumbnail(max_size, Image.LANCZOS)
+                        img.save(file_path, optimize=True, quality=85)
+            except Exception as e:
+                print(f"Image optimization failed: {e}")
+        else:
+            print("PIL not available - skipping image optimization")
         
         # Return the URL path
         image_url = f"/uploads/{unique_filename}"
@@ -566,8 +641,11 @@ async def upload_payment_receipt(
         Receipt file: {unique_filename}
         """
         
-        # Send email notification
-        send_email(admin_email, subject, body, str(file_path))
+        # Send email notification (non-blocking)
+        try:
+            send_email(admin_email, subject, body, str(file_path))
+        except Exception as e:
+            print(f"Email notification failed, but upload was successful: {e}")
         
         return {"message": "Payment receipt uploaded successfully", "upload_id": upload_result.data[0]["id"]}
         
